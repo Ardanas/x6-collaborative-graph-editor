@@ -15,6 +15,10 @@
         />
       </div>
     </template>
+
+    <div v-for="state in otherUsers" :key="state.id" class="avatar-container">
+           <Avatar :name="state.name" />
+      </div>
   </div>
 </template>
 
@@ -23,10 +27,11 @@ import { defineComponent, onMounted, ref, onUnmounted, computed } from 'vue';
 import { Graph } from '@antv/x6';
 import { Collaboration } from '../utils/collaboration';
 import Cursor from './Cursor.vue';
+import Avatar from './Avatar.vue';
 
 export default defineComponent({
   name: 'GraphComponent',
-  components: { Cursor },
+  components: { Cursor, Avatar },
   setup() {
     const container = ref<HTMLDivElement | null>(null);
     let graph: Graph | null = null;
@@ -109,8 +114,6 @@ export default defineComponent({
 
       // 添加全局事件监听器
       window.addEventListener('mousemove', handleMouseMove);
-
-
     });
 
     onUnmounted(() => {
@@ -134,10 +137,19 @@ export default defineComponent({
   width: 100%;
   height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 .graph-container {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+}
+
+.avatar-container {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
 }
 </style>
