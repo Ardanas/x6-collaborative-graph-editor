@@ -5,12 +5,14 @@
 <script lang="ts">
 import { defineComponent, onMounted, ref, onUnmounted } from 'vue';
 import { Graph } from '@antv/x6';
+import { Collaboration } from '../utils/collaboration';
 
 export default defineComponent({
   name: 'GraphComponent',
   setup() {
     const container = ref<HTMLDivElement | null>(null);
     let graph: Graph | null = null;
+    let collaboration: Collaboration | null = null;
 
     onMounted(() => {
       if (container.value) {
@@ -25,8 +27,11 @@ export default defineComponent({
           history: true,
         });
 
-        // 创建矩形
-        const rect = graph.addNode({
+        // 初始化协同功能
+        collaboration = new Collaboration(graph, 'x6-demo-room');
+
+        // 创建初始节点
+        graph.addNode({
           shape: 'rect',
           x: 100,
           y: 100,
@@ -42,8 +47,7 @@ export default defineComponent({
           },
         });
 
-        // 创建圆形
-        const circle = graph.addNode({
+        graph.addNode({
           shape: 'circle',
           x: 300,
           y: 100,
