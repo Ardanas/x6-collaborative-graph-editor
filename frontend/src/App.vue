@@ -1,8 +1,5 @@
 <template>
-  <div class="app">
-    <h1>Vite + Vue 3 + AntV X6 演示</h1>
-    <GraphComponent />
-  </div>
+   <GraphComponent />
 </template>
 
 <script lang="ts">
@@ -17,13 +14,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>

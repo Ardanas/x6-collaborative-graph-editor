@@ -12,7 +12,7 @@
   "dependencies": {
     "@antv/x6": "^2.18.1",
     "vue": "^3.4.21",
-    "ws": "^8.18.0",
+    "y-protocols": "^1.0.6",
     "y-websocket": "^2.0.4",
     "yjs": "^13.6.19"
   },
