@@ -8,6 +8,7 @@ export class Collaboration {
   private graph: Graph
   private nodesMap: Y.Map<any>
   private edgesMap: Y.Map<any>
+  private readyCallbacks: (() => void)[] = []
 
   constructor(graph: Graph, room: string) {
     this.graph = graph
@@ -18,6 +19,32 @@ export class Collaboration {
 
     this.bindEvents()
     this.syncInitialState()
+
+    this.provider.on('sync', (isSynced: boolean) => {
+      if (isSynced) {
+        this.readyCallbacks.forEach(callback => callback())
+        this.readyCallbacks = []
+      }
+    })
+  }
+
+  onReady(callback: () => void) {
+    if (this.provider.synced) {
+      callback()
+    } else {
+      this.readyCallbacks.push(callback)
+    }
+  }
+
+  addNode(nodeData: any) {
+    const node = this.graph.addNode(nodeData)
+    this.updateNode(node)
+    return node
+  }
+
+  destroy() {
+    this.provider.destroy()
+    this.doc.destroy()
   }
 
   private bindEvents() {

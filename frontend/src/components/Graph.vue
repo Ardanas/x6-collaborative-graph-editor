@@ -30,37 +30,43 @@ export default defineComponent({
         // 初始化协同功能
         collaboration = new Collaboration(graph, 'x6-demo-room');
 
-        // 创建初始节点
-        graph.addNode({
-          shape: 'rect',
-          x: 100,
-          y: 100,
-          width: 80,
-          height: 40,
-          label: '矩形',
-          attrs: {
-            body: {
-              fill: '#f5f5f5',
-              stroke: '#d9d9d9',
-              strokeWidth: 1,
-            },
-          },
-        });
+        // 等待协同数据同步完成
+        collaboration.onReady(() => {
+          // 检查是否已有节点
+          if (graph.getNodes().length === 0) {
+            // 只有在没有节点时才创建初始节点
+            collaboration.addNode({
+              shape: 'rect',
+              x: 100,
+              y: 100,
+              width: 80,
+              height: 40,
+              label: '矩形',
+              attrs: {
+                body: {
+                  fill: '#f5f5f5',
+                  stroke: '#d9d9d9',
+                  strokeWidth: 1,
+                },
+              },
+            });
 
-        graph.addNode({
-          shape: 'circle',
-          x: 300,
-          y: 100,
-          width: 60,
-          height: 60,
-          label: '圆形',
-          attrs: {
-            body: {
-              fill: '#f5f5f5',
-              stroke: '#d9d9d9',
-              strokeWidth: 1,
-            },
-          },
+            collaboration.addNode({
+              shape: 'circle',
+              x: 300,
+              y: 100,
+              width: 60,
+              height: 60,
+              label: '圆形',
+              attrs: {
+                body: {
+                  fill: '#f5f5f5',
+                  stroke: '#d9d9d9',
+                  strokeWidth: 1,
+                },
+              },
+            });
+          }
         });
 
         // 启用节点的拖拽和调整大小功能
@@ -73,6 +79,9 @@ export default defineComponent({
     onUnmounted(() => {
       if (graph) {
         graph.dispose();
+      }
+      if (collaboration) {
+        collaboration.destroy();
       }
     });
 
