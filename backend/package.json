@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node index.js"
+    "dev": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.18.0",
+    "@hocuspocus/extension-logger": "^2.13.5",
+    "@hocuspocus/server": "^2.13.5",
     "y-websocket": "^2.0.4",
     "yjs": "^13.6.19"
   }

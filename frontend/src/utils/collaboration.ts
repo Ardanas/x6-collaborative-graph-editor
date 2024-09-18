@@ -1,11 +1,6 @@
-/// <reference types="yjs" />
-/// <reference types="y-websocket" />
-/// <reference types="@antv/x6" />
-
 import * as Y from 'yjs'
-import { WebsocketProvider } from 'y-websocket'
-import { Graph, Node, Edge, Cell } from '@antv/x6'
-import * as awarenessProtocol from "y-protocols/awareness.js";
+import { HocuspocusProvider } from '@hocuspocus/provider'
+import { Graph, Node, Edge } from '@antv/x6'
 
 interface UserAwareness {
   id: string;
@@ -14,13 +9,9 @@ interface UserAwareness {
   mouse?: { x: number; y: number };
 }
 
-
-
-
 export class Collaboration {
   private doc: Y.Doc
-  private provider: WebsocketProvider
-  private awareness: Y.Awareness
+  private provider: HocuspocusProvider
   private graph: Graph
   private nodesMap: Y.Map<any>
   private edgesMap: Y.Map<any>
@@ -32,10 +23,11 @@ export class Collaboration {
   constructor(graph: Graph, room: string) {
     this.graph = graph
     this.doc = new Y.Doc()
-    this.provider = new WebsocketProvider('ws://localhost:1234', room, this.doc, {
-      awareness: new awarenessProtocol.Awareness(this.doc)
+    this.provider = new HocuspocusProvider({
+      url: 'ws://localhost:1234',
+      name: room,
+      document: this.doc
     })
-    this.awareness = this.provider.awareness
     this.nodesMap = this.doc.getMap('nodes')
     this.edgesMap = this.doc.getMap('edges')
     this.clientId = this.doc.clientID.toString()
@@ -52,8 +44,7 @@ export class Collaboration {
       }
     })
 
-    // this.nodesMap.observe(() => this.updateNodeStates())
-    this.awareness.on('change', this.handleAwarenessChange.bind(this))
+    this.provider.awareness.on('change', this.handleAwarenessChange.bind(this))
   }
 
   onReady(callback: () => void) {
@@ -69,7 +60,6 @@ export class Collaboration {
       ...nodeData,
       data: {
         ...nodeData.data,
-        // lockState: { isLocked: false, lockedBy: null },
       },
     })
     this.updateNode(node)
@@ -77,23 +67,10 @@ export class Collaboration {
   }
 
   destroy() {
-    this.awareness.setLocalState(null)
+    this.provider.awareness.setLocalState(null)
     this.provider.destroy()
     this.doc.destroy()
   }
-
-//   setNodeState(nodeId: string, isLocked: boolean) {
-//     const node = this.graph.getCellById(nodeId) as Node
-//     if (node) {
-//       const currentData = node.getData() || {}
-//       const newLockState = {
-//         isLocked,
-//         lockedBy: isLocked ? this.clientId : null
-//       }
-//       node.setData({ ...currentData, lockState: newLockState })
-//       this.updateNode(node)
-//     }
-//   }
 
   isNodeLocked(nodeId: string): boolean {
     const node = this.graph.getCellById(nodeId) as Node
@@ -104,20 +81,19 @@ export class Collaboration {
   }
 
   updateMousePosition(x: number, y: number) {
-    const state = this.awareness.getLocalState() as UserAwareness
+    const state = this.provider.awareness.getLocalState() as UserAwareness
     if (state) {
       state.mouse = { x, y }
-      this.awareness.setLocalState(state)
+      this.provider.awareness.setLocalState(state)
     }
   }
 
   onAwarenessChange(callback: (users: UserAwareness[]) => void) {
     this.awarenessChangeCallback = callback;
-    this.awareness.on('change', this.handleAwarenessChange.bind(this));
+    this.provider.awareness.on('change', this.handleAwarenessChange.bind(this));
   }
 
-  private handleAwarenessChange(change: any, origin: string) {
-    if (origin === 'local') return; // 自己的操作不触发回调
+  private handleAwarenessChange() {
     if (this.awarenessChangeCallback) {
       const users = this.getUsers();
       this.awarenessChangeCallback(users);
@@ -126,9 +102,7 @@ export class Collaboration {
 
   getUsers(): UserAwareness[] {
     const users: UserAwareness[] = [];
-    console.log('this.clientId',this.clientId);
-
-    this.awareness.getStates().forEach((state: any, clientId: number) => {
+    this.provider.awareness.getStates().forEach((state: any, clientId: number) => {
       if (state && clientId.toString() !== this.clientId && state.mouse?.x !== undefined) {
         users.push(state as UserAwareness);
       }
@@ -150,16 +124,8 @@ export class Collaboration {
       name: Math.random().toString(36).substring(2, 15),
       color: this.userColor,
     }
-    this.awareness.setLocalState(state)
+    this.provider.awareness.setLocalState(state)
   }
-
-//   private updateNodeStates() {
-//     this.graph.getNodes().forEach(node => {
-//       const isLocked = this.isNodeLocked(node.id)
-//       node.setAttrByPath('body/style/opacity', isLocked ? 0.5 : 1)
-//       node.setAttrByPath('label/style/opacity', isLocked ? 0.5 : 1)
-//     })
-//   }
 
   private bindEvents() {
     this.graph.on('node:added', ({ node }) => this.updateNode(node))
@@ -190,29 +156,10 @@ export class Collaboration {
         }
       })
     })
-
-    // this.graph.on('node:mousedown', ({ node }) => {
-    //   if (!this.isNodeLocked(node.id)) {
-    //     this.setNodeState(node.id, true)
-    //   }
-    // })
-
-    // this.graph.on('node:mouseup', ({ node }) => {
-    //   const data = node.getData() || {}
-    //   const lockState = data.lockState || { isLocked: false, lockedBy: null }
-    //   if (lockState.lockedBy === this.clientId) {
-    //     this.setNodeState(node.id, false)
-    //   }
-    // })
   }
 
   private syncInitialState() {
-    this.graph.getNodes().forEach(node => {
-    //   if (!node.getData()) {
-    //     node.setData({ lockState: { isLocked: false, lockedBy: null } })
-    //   }
-      this.updateNode(node)
-    })
+    this.graph.getNodes().forEach(node => this.updateNode(node))
     this.graph.getEdges().forEach(edge => this.updateEdge(edge))
   }
 
@@ -239,7 +186,6 @@ export class Collaboration {
     } else {
       this.graph.addNode(data)
     }
-    // this.updateNodeStates()
   }
 
   private updateGraphEdge(id: string, data: any) {
