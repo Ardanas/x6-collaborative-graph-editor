@@ -44,7 +44,7 @@ export class Collaboration {
       }
     })
 
-    this.provider.awareness.on('change', this.handleAwarenessChange.bind(this))
+    this.provider.awareness?.on('change', this.handleAwarenessChange.bind(this))
   }
 
   onReady(callback: () => void) {
@@ -67,7 +67,7 @@ export class Collaboration {
   }
 
   destroy() {
-    this.provider.awareness.setLocalState(null)
+    this.provider.awareness!.setLocalState(null)
     this.provider.destroy()
     this.doc.destroy()
   }
@@ -81,16 +81,16 @@ export class Collaboration {
   }
 
   updateMousePosition(x: number, y: number) {
-    const state = this.provider.awareness.getLocalState() as UserAwareness
+    const state = this.provider.awareness!.getLocalState() as UserAwareness
     if (state) {
       state.mouse = { x, y }
-      this.provider.awareness.setLocalState(state)
+      this.provider.awareness!.setLocalState(state)
     }
   }
 
   onAwarenessChange(callback: (users: UserAwareness[]) => void) {
     this.awarenessChangeCallback = callback;
-    this.provider.awareness.on('change', this.handleAwarenessChange.bind(this));
+    this.provider.awareness?.on('change', this.handleAwarenessChange.bind(this));
   }
 
   private handleAwarenessChange() {
@@ -102,7 +102,7 @@ export class Collaboration {
 
   getUsers(): UserAwareness[] {
     const users: UserAwareness[] = [];
-    this.provider.awareness.getStates().forEach((state: any, clientId: number) => {
+    this.provider.awareness!.getStates().forEach((state: any, clientId: number) => {
       if (state && clientId.toString() !== this.clientId && state.mouse?.x !== undefined) {
         users.push(state as UserAwareness);
       }
@@ -124,7 +124,7 @@ export class Collaboration {
       name: Math.random().toString(36).substring(2, 15),
       color: this.userColor,
     }
-    this.provider.awareness.setLocalState(state)
+    this.provider.awareness!.setLocalState(state)
   }
 
   private bindEvents() {

@@ -32,3 +32,11 @@ body {
     background-color: #ffffff;
   }
 }
+
+.x6-widget-selection-box {
+  border: 2px dashed #239edd;
+}
+
+.x6-widget-selection-inner {
+  border: 1px solid #239edd;
+}

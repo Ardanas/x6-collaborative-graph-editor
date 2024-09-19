@@ -25,6 +25,12 @@
 <script lang="ts">
 import { defineComponent, onMounted, ref, onUnmounted, computed } from 'vue';
 import { Graph } from '@antv/x6';
+import { Clipboard } from '@antv/x6-plugin-clipboard'
+import { Snapline } from '@antv/x6-plugin-snapline'
+import { Transform } from '@antv/x6-plugin-transform'
+import { Scroller } from '@antv/x6-plugin-scroller'
+import { Selection } from '@antv/x6-plugin-selection'
+
 import { Collaboration } from '../utils/collaboration';
 import Cursor from './Cursor.vue';
 import Avatar from './Avatar.vue';
@@ -52,7 +58,7 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
+    function initGraph() {
       graph = new Graph({
         container: container.value,
         grid: true,
@@ -60,8 +66,58 @@ export default defineComponent({
         rotating: false,
         snapline: true,
         history: true,
-        interacting: {},
+        background: {
+          color: '#F2F7FA',
+        },
+        mousewheel: {
+          enabled: true,
+          minScale: 0.2,
+          maxScale: 4,
+        },
+        interacting: {
+
+        },
       });
+
+      graph.use(
+        new Transform({
+          resizing: true,
+        }),
+      )
+
+      graph.use(
+        new Snapline({
+          enabled: true,
+        }),
+      )
+
+      graph.use(
+        new Clipboard({
+          enabled: true,
+        }),
+      )
+
+      graph.use(
+        new Scroller({
+          enabled: true,
+          pannable: true,
+        }),
+      )
+
+      graph.use(
+        new Selection({
+          enabled: true,
+          multiple: true,
+          movable: true,
+          showNodeSelectionBox: true,
+        }),
+      )
+    }
+
+    onMounted(() => {
+
+      initGraph()
+
 
       collaboration = new Collaboration(graph, 'x6-demo-room');
 
@@ -82,6 +138,7 @@ export default defineComponent({
                 strokeWidth: 1,
               },
             },
+            data: {}
           });
 
           collaboration?.addNode({
@@ -98,18 +155,13 @@ export default defineComponent({
                 strokeWidth: 1,
               },
             },
+            data: {}
           });
         }
 
         collaboration.onAwarenessChange((users) => {
           otherUsers.value = users;
         });
-      });
-
-      graph.on('node:selected', ({ node }) => {
-        if (collaboration && collaboration.isNodeLocked(node.id)) {
-          node.unselect();
-        }
       });
 
       // 添加全局事件监听器
@@ -152,4 +204,6 @@ export default defineComponent({
   right: 10px;
   z-index: 1000;
 }
+
+
 </style>
