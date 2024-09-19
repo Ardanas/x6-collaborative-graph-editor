@@ -75,7 +75,15 @@ export default defineComponent({
           maxScale: 4,
         },
         interacting: {
-
+          nodeMovable: ({ cell }) => collaboration?.canOperate(cell) ?? false,
+          magnetConnectable: ({ cell }) => collaboration?.canOperate(cell) ?? false,
+          edgeMovable: (edge) => {
+            const sourceNode = edge.getSourceNode();
+            const targetNode = edge.getTargetNode();
+            return (sourceNode && targetNode)
+              ? (collaboration?.canOperate(sourceNode) && collaboration?.canOperate(targetNode)) ?? false
+              : false;
+          },
         },
       });
 
@@ -112,6 +120,33 @@ export default defineComponent({
           showNodeSelectionBox: true,
         }),
       )
+
+      // 移除 node:mousedown 和 node:mouseup 事件监听器
+      // 添加 node:mousemove 事件监听器
+      graph.on('node:mousemove', ({ node }) => {
+        if (!graph.isSelected(node) && !node.getData().operatorId) {
+          collaboration?.setNodeOperator(node);
+        }
+      });
+
+        graph.on('node:moved', ({ node }) => {
+        if (!graph.isSelected(node)) {
+          collaboration?.clearNodeOperator(node);
+        }
+      });
+
+      graph.on('selection:changed', ({ selected, removed }) => {
+        selected.forEach((cell) => {
+          if (cell.isNode() && !cell.getData().operatorId) {
+            collaboration?.setNodeOperator(cell);
+          }
+        });
+        removed.forEach((cell) => {
+          if (cell.isNode()) {
+            collaboration?.clearNodeOperator(cell);
+          }
+        });
+      });
     }
 
     onMounted(() => {

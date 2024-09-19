@@ -196,4 +196,34 @@ export class Collaboration {
       this.graph.addEdge(data)
     }
   }
+
+  setNodeOperator(nodeId: string) {
+    const node = this.graph.getCellById(nodeId) as Node
+    if (node) {
+      node.setData({ ...node.getData(), operatorId: this.clientId })
+      this.updateNode(node)
+    }
+  }
+
+  clearNodeOperator(nodeId: string) {
+    const node = this.graph.getCellById(nodeId) as Node
+    if (node) {
+      const data = node.getData()
+      data.operatorId = null
+      node.setData(data)
+      this.updateNode(node)
+    }
+  }
+
+  canOperateNode(nodeId: string): boolean {
+    const node = this.graph.getCellById(nodeId) as Node
+    if (!node) return false
+    const data = node.getData() || {}
+    return !data.operatorId || data.operatorId === this.clientId
+  }
+
+  canOperate(cell: Node | Edge): boolean {
+    const data = cell.getData() || {};
+    return !data.operatorId || data.operatorId === this.clientId;
+  }
 }
