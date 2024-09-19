@@ -121,32 +121,75 @@ export default defineComponent({
         }),
       )
 
+      // 添加自定义节点
+      Graph.registerNode(
+        'custom-rect',
+        {
+          inherit: 'rect',
+          attrs: {
+            body: {
+              strokeWidth: 2,
+            },
+            label: {
+              fill: '#333',
+              fontSize: 13,
+            },
+          },
+        },
+        true
+      );
+
+      // 替换原有的 node:changed 事件处理
+      graph.on('node:changed', ({ node }) => {
+          // collaboration.setShouldSyncAppearance(true);
+          collaboration.updateNode(node);
+      });
+
       // 移除 node:mousedown 和 node:mouseup 事件监听器
       // 添加 node:mousemove 事件监听器
       graph.on('node:mousemove', ({ node }) => {
-        if (!graph.isSelected(node) && !node.getData().operatorId) {
-          collaboration?.setNodeOperator(node);
+        if (!graph.isSelected(node) && collaboration.canOperate(node)) {
+          collaboration.setNodeOperator(node);
         }
       });
 
-        graph.on('node:moved', ({ node }) => {
+      graph.on('node:moved', ({ node }) => {
         if (!graph.isSelected(node)) {
-          collaboration?.clearNodeOperator(node);
+          collaboration.clearNodeOperator(node)
         }
       });
 
       graph.on('selection:changed', ({ selected, removed }) => {
         selected.forEach((cell) => {
-          if (cell.isNode() && !cell.getData().operatorId) {
-            collaboration?.setNodeOperator(cell);
+          if (cell.isNode() && collaboration.canOperate(cell)) {
+            collaboration.setNodeOperator(cell);
           }
         });
         removed.forEach((cell) => {
           if (cell.isNode()) {
-            collaboration?.clearNodeOperator(cell);
+            collaboration.clearNodeOperator(cell);
           }
         });
       });
+
+      graph.on('node:change:data', ({ node }) => {
+        updateNodeAppearance(node);
+      });
+    }
+
+    function updateNodeAppearance(node: Node) {
+      const data = node.getData();
+      if (collaboration) {
+        collaboration.setShouldSyncAppearance(false);
+        if (data.operator && !collaboration.isCurrentUserOperator(data)) {
+          node.attr('body/stroke', data.operator.color);
+          node.attr('body/strokeWidth', 3);
+        } else {
+          node.attr('body/stroke', '#333');
+          node.attr('body/strokeWidth', 1);
+        }
+        collaboration.setShouldSyncAppearance(true);
+      }
     }
 
     onMounted(() => {
@@ -160,7 +203,7 @@ export default defineComponent({
         userColor.value = collaboration.getCurrentUserColor();
         if (graph && graph.getNodes().length === 0) {
           collaboration?.addNode({
-            shape: 'rect',
+            shape: 'custom-rect',
             x: 100,
             y: 100,
             width: 80,
@@ -169,15 +212,13 @@ export default defineComponent({
             attrs: {
               body: {
                 fill: '#f5f5f5',
-                stroke: '#d9d9d9',
-                strokeWidth: 1,
               },
             },
             data: {}
           });
 
           collaboration?.addNode({
-            shape: 'circle',
+            shape: 'custom-rect',
             x: 300,
             y: 100,
             width: 60,
@@ -186,13 +227,14 @@ export default defineComponent({
             attrs: {
               body: {
                 fill: '#f5f5f5',
-                stroke: '#d9d9d9',
-                strokeWidth: 1,
               },
             },
             data: {}
           });
         }
+
+        // 更新所有现有节点的外观
+        graph.getNodes().forEach(updateNodeAppearance);
 
         collaboration.onAwarenessChange((users) => {
           otherUsers.value = users;

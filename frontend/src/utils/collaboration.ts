@@ -9,6 +9,8 @@ interface UserAwareness {
   mouse?: { x: number; y: number };
 }
 
+
+
 export class Collaboration {
   private doc: Y.Doc
   private provider: HocuspocusProvider
@@ -19,6 +21,7 @@ export class Collaboration {
   private clientId: string
   private userColor: string
   private awarenessChangeCallback: ((users: UserAwareness[]) => void) | null = null;
+  private shouldSyncAppearance: boolean = true;
 
   constructor(graph: Graph, room: string) {
     this.graph = graph
@@ -114,9 +117,14 @@ export class Collaboration {
     return this.userColor
   }
 
-  private generateRandomColor(): string {
-    return '#' + Math.floor(Math.random()*16777215).toString(16)
-  }
+  private generateRandomColor() {
+    const letters = "0123456789ABCDEF";
+    let color = "#";
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
 
   private setLocalAwareness() {
     const state: UserAwareness = {
@@ -130,7 +138,7 @@ export class Collaboration {
   private bindEvents() {
     this.graph.on('node:added', ({ node }) => this.updateNode(node))
     this.graph.on('node:removed', ({ node }) => this.removeNode(node))
-    this.graph.on('node:changed', ({ node }) => this.updateNode(node))
+
     this.graph.on('edge:added', ({ edge }) => this.updateEdge(edge))
     this.graph.on('edge:removed', ({ edge }) => this.removeEdge(edge))
     this.graph.on('edge:changed', ({ edge }) => this.updateEdge(edge))
@@ -164,7 +172,9 @@ export class Collaboration {
   }
 
   private updateNode(node: Node) {
-    this.nodesMap.set(node.id, node.toJSON())
+    if (this.shouldSyncAppearance) {
+      this.nodesMap.set(node.id, node.toJSON())
+    }
   }
 
   private removeNode(node: Node) {
@@ -197,33 +207,40 @@ export class Collaboration {
     }
   }
 
-  setNodeOperator(nodeId: string) {
-    const node = this.graph.getCellById(nodeId) as Node
-    if (node) {
-      node.setData({ ...node.getData(), operatorId: this.clientId })
-      this.updateNode(node)
+  setNodeOperator(node: Node) {
+    const currentData = node.getData();
+    if (!currentData.operator) {
+      const operatorInfo: UserAwareness = this.getLocalState();
+      node.setData({ ...currentData, operator: operatorInfo });
+      this.updateNode(node);
+      return true;
     }
+    return false;
   }
 
-  clearNodeOperator(nodeId: string) {
-    const node = this.graph.getCellById(nodeId) as Node
-    if (node) {
-      const data = node.getData()
-      data.operatorId = null
-      node.setData(data)
-      this.updateNode(node)
+  clearNodeOperator(node: Node) {
+    const data = node.getData();
+    if (this.isCurrentUserOperator(data)) {
+      data.operator = null
+      node.setData(data);
+      this.updateNode(node);
     }
-  }
-
-  canOperateNode(nodeId: string): boolean {
-    const node = this.graph.getCellById(nodeId) as Node
-    if (!node) return false
-    const data = node.getData() || {}
-    return !data.operatorId || data.operatorId === this.clientId
   }
 
   canOperate(cell: Node | Edge): boolean {
     const data = cell.getData() || {};
-    return !data.operatorId || data.operatorId === this.clientId;
+    return !data.operator || data.operator.id === this.clientId;
+  }
+
+  isCurrentUserOperator(data: Record<string, any>): boolean {
+    return data.operator && data.operator.id === this.clientId;
+  }
+
+  getLocalState(): UserAwareness {
+    return this.provider.awareness!.getLocalState() as UserAwareness;
+  }
+
+  setShouldSyncAppearance(value: boolean) {
+    this.shouldSyncAppearance = value;
   }
 }
