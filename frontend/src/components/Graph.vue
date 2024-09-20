@@ -1,5 +1,6 @@
 <template>
   <div class="flow-container">
+    <Toolbar :dnd="dnd" :graph="graph" />
     <div
       ref="container"
       class="graph-container"
@@ -17,33 +18,37 @@
     </template>
 
     <div v-for="state in otherUsers" :key="state.id" class="avatar-container">
-           <Avatar :name="state.name" />
-      </div>
+      <Avatar :name="state.name" />
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, ref, onUnmounted, computed } from 'vue';
-import { Graph } from '@antv/x6';
+import { Graph, Node } from '@antv/x6';
 import { Clipboard } from '@antv/x6-plugin-clipboard'
 import { Snapline } from '@antv/x6-plugin-snapline'
 import { Transform } from '@antv/x6-plugin-transform'
 import { Scroller } from '@antv/x6-plugin-scroller'
 import { Selection } from '@antv/x6-plugin-selection'
+import { Dnd } from '@antv/x6-plugin-dnd'
 
 import { Collaboration } from '../utils/collaboration';
 import Cursor from './Cursor.vue';
 import Avatar from './Avatar.vue';
+import Toolbar from './Toolbar.vue';
 
 export default defineComponent({
   name: 'GraphComponent',
-  components: { Cursor, Avatar },
+  components: { Cursor, Avatar, Toolbar },
   setup() {
     const container = ref<HTMLDivElement | null>(null);
     let graph: Graph | null = null;
     let collaboration: Collaboration | null = null;
     const userColor = ref('');
     const otherUsers = ref<any[]>([]);
+    const dnd = ref<Dnd | null>(null);
+    const graphRef = ref<Graph | null>(null);
 
     const cursorStyle = computed(() => ({
       cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="fill: ${userColor.value};"><circle cx="8" cy="8" r="8"/></svg>') 8 8, auto`
@@ -59,7 +64,7 @@ export default defineComponent({
     };
 
     function initGraph() {
-      graph = new Graph({
+      graphRef.value = new Graph({
         container: container.value,
         grid: true,
         resizing: true,
@@ -87,32 +92,32 @@ export default defineComponent({
         },
       });
 
-      graph.use(
+      graphRef.value.use(
         new Transform({
           resizing: true,
         }),
       )
 
-      graph.use(
+      graphRef.value.use(
         new Snapline({
           enabled: true,
         }),
       )
 
-      graph.use(
+      graphRef.value.use(
         new Clipboard({
           enabled: true,
         }),
       )
 
-      graph.use(
+      graphRef.value.use(
         new Scroller({
           enabled: true,
           pannable: true,
         }),
       )
 
-      graph.use(
+      graphRef.value.use(
         new Selection({
           enabled: true,
           multiple: true,
@@ -120,6 +125,13 @@ export default defineComponent({
           showNodeSelectionBox: true,
         }),
       )
+
+      // 初始化 DND 插件
+      dnd.value = new Dnd({
+        target: graphRef.value,
+        scaled: false,
+        animation: true,
+      });
 
       // 添加自定义节点
       Graph.registerNode(
@@ -142,22 +154,22 @@ export default defineComponent({
 
       // 移除 node:mousedown 和 node:mouseup 事件监听器
       // 添加 node:mousemove 事件监听器
-      graph.on('node:mousemove', ({ node }) => {
-        if (!graph.isSelected(node) && collaboration?.canOperate(node)) {
+      graphRef.value.on('node:mousemove', ({ node }) => {
+        if (!graphRef.value.isSelected(node) && collaboration?.canOperate(node)) {
           collaboration.setNodeOperator(node);
         }
       });
 
-      graph.on('node:moved', ({ node }) => {
+      graphRef.value.on('node:moved', ({ node }) => {
         if (collaboration?.canOperate(node)) {
           collaboration.updateNodePosition(node);
         }
-        if (!graph.isSelected(node)) {
+        if (!graphRef.value.isSelected(node)) {
           collaboration?.clearNodeOperator(node);
         }
       });
 
-      graph.on('selection:changed', ({ selected, removed }) => {
+      graphRef.value.on('selection:changed', ({ selected, removed }) => {
         selected.forEach((cell) => {
           if (cell.isNode() && collaboration?.canOperate(cell)) {
             collaboration.setNodeOperator(cell);
@@ -172,7 +184,7 @@ export default defineComponent({
         });
       });
 
-      graph.on('cell:change:*', ({ cell, key, current, previous, options }) => {
+      graphRef.value.on('cell:change:*', ({ cell, key, current, previous, options }) => {
         if (cell.isNode()) {
           const node = cell as Node;
           if (key === 'position' || key === 'size') {
@@ -187,6 +199,16 @@ export default defineComponent({
           }
         }
       });
+
+      graphRef.value.on('node:added', ({ node }) => {
+        if (collaboration?.canOperate(node)) {
+          collaboration.setNodeOperator(node);
+          updateNodeAppearance(node);
+        }
+      });
+
+      // 添加全局事件监听器
+      window.addEventListener('mousemove', handleMouseMove);
     }
 
     function updateNodeAppearance(node: Node) {
@@ -202,15 +224,17 @@ export default defineComponent({
       }
     }
 
+    // 移除 onDrop 函数，因为我们不再需要它
+
     onMounted(() => {
 
       initGraph()
 
-      collaboration = new Collaboration(graph, 'x6-demo-room');
+      collaboration = new Collaboration(graphRef.value, 'x6-demo-room');
 
       collaboration.onReady(() => {
         userColor.value = collaboration.getCurrentUserColor();
-        if (graph && graph.getNodes().length === 0) {
+        if (graphRef.value && graphRef.value.getNodes().length === 0) {
           collaboration?.addNode({
             shape: 'custom-rect',
             x: 100,
@@ -243,7 +267,7 @@ export default defineComponent({
         }
 
         // 更新所有现有节点的外观
-        // graph.getNodes().forEach(updateNodeAppearance);
+        // graphRef.value.getNodes().forEach(updateNodeAppearance);
 
         collaboration.onAwarenessChange((users) => {
           otherUsers.value = users;
@@ -255,25 +279,34 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (graph) {
-        graph.dispose();
+      if (graphRef.value) {
+        graphRef.value.dispose();
       }
       if (collaboration) {
         collaboration.destroy();
       }
       // 移除全局事件监听器
       window.removeEventListener('mousemove', handleMouseMove);
+      if (dnd.value) {
+        dnd.value.dispose();
+      }
     });
 
-    return { container, cursorStyle, otherUsers };
+    return {
+      container,
+      cursorStyle,
+      otherUsers,
+      dnd, // 确保返回 dnd
+      graph: graphRef, // 确保返回 graph
+    };
   },
 });
 </script>
 
 <style scoped>
 .flow-container {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   position: relative;
   overflow: hidden;
 }
@@ -290,6 +323,4 @@ export default defineComponent({
   right: 10px;
   z-index: 1000;
 }
-
-
 </style>

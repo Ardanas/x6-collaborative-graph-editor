@@ -58,14 +58,9 @@ export class Collaboration {
   }
 
   addNode(nodeData: any) {
-    const node = this.graph.addNode({
-      ...nodeData,
-      data: {
-        ...nodeData.data,
-      },
-    })
-    this.updateNode(node)
-    return node
+    const node = this.graph.addNode(nodeData);
+    this.updateNode(node);
+    return node;
   }
 
   destroy() {
@@ -75,7 +70,7 @@ export class Collaboration {
   }
 
   setNodeOperator(node: Node): boolean {
-    const currentData = node.getData();
+    const currentData = node.getData() || {}; // 如果 getData() 返回 undefined，使用空对象
     if (!currentData.operator) {
       const operatorInfo: UserAwareness = this.getLocalState();
       node.setData({ ...currentData, operator: operatorInfo }, { ignoreSync: true });
