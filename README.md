@@ -29,13 +29,55 @@ This project is a real-time collaborative graph editor built on top of the X6 gr
 - @hocuspocus/provider: Client-side provider for Hocuspocus
 - @hocuspocus/server: Server-side implementation of Hocuspocus
 
+## Getting Started
+
+To run this project, you need to start both the frontend and backend servers.
+
+### Backend
+
+1. Navigate to the backend directory:
+   ```
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```
+   pnpm install
+   ```
+
+3. Start the backend server:
+   ```
+   pnpm run start
+   ```
+
+The backend server will start running on `http://localhost:1234`.
+
+### Frontend
+
+1. Navigate to the frontend directory:
+   ```
+   cd frontend
+   ```
+
+2. Install dependencies:
+   ```
+   pnpm install
+   ```
+
+3. Start the frontend development server:
+   ```
+   pnpm run dev
+   ```
+
+The frontend application will be available at `http://localhost:5173` (or another port if 5173 is already in use).
+
+Open this URL in multiple browser windows to test the collaborative features.
+
 ## References
 
 - Hocuspocus Documentation: [https://tiptap.dev/docs/hocuspocus/introduction](https://tiptap.dev/docs/hocuspocus/introduction)
 - Yjs Documentation: [https://docs.yjs.dev/](https://docs.yjs.dev/)
 - X6 API Documentation: [https://x6.antv.antgroup.com/api/graph/graph](https://x6.antv.antgroup.com/api/graph/graph)
-
-
 
 ## License
 
