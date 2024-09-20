@@ -129,6 +129,7 @@ export default defineComponent({
           attrs: {
             body: {
               strokeWidth: 2,
+              stroke: '#333'
             },
             label: {
               fill: '#333',
@@ -139,63 +140,71 @@ export default defineComponent({
         true
       );
 
-      // 替换原有的 node:changed 事件处理
-      graph.on('node:changed', ({ node }) => {
-          // collaboration.setShouldSyncAppearance(true);
-          collaboration.updateNode(node);
-      });
-
       // 移除 node:mousedown 和 node:mouseup 事件监听器
       // 添加 node:mousemove 事件监听器
       graph.on('node:mousemove', ({ node }) => {
-        if (!graph.isSelected(node) && collaboration.canOperate(node)) {
+        if (!graph.isSelected(node) && collaboration?.canOperate(node)) {
           collaboration.setNodeOperator(node);
         }
       });
 
       graph.on('node:moved', ({ node }) => {
+        if (collaboration?.canOperate(node)) {
+          collaboration.updateNodePosition(node);
+        }
         if (!graph.isSelected(node)) {
-          collaboration.clearNodeOperator(node)
+          collaboration?.clearNodeOperator(node);
         }
       });
 
       graph.on('selection:changed', ({ selected, removed }) => {
         selected.forEach((cell) => {
-          if (cell.isNode() && collaboration.canOperate(cell)) {
+          if (cell.isNode() && collaboration?.canOperate(cell)) {
             collaboration.setNodeOperator(cell);
           }
         });
+        console.log('removed',removed);
+
         removed.forEach((cell) => {
           if (cell.isNode()) {
-            collaboration.clearNodeOperator(cell);
+            collaboration?.clearNodeOperator(cell);
           }
         });
       });
 
-      graph.on('node:change:data', ({ node }) => {
-        updateNodeAppearance(node);
+      graph.on('cell:change:*', ({ cell, key, current, previous, options }) => {
+        if (cell.isNode()) {
+          const node = cell as Node;
+          if (key === 'position' || key === 'size') {
+            collaboration?.updateNodePosition(node);
+          } else if (key === 'data') {
+            updateNodeAppearance(node);
+          } else if (key === 'attrs') {
+            // 不同步外观相关的属性
+            if (!options?.ignoreSync && !['body/stroke', 'body/strokeWidth'].includes(current.path)) {
+              collaboration?.updateNode(node);
+            }
+          }
+        }
       });
     }
 
     function updateNodeAppearance(node: Node) {
-      const data = node.getData();
       if (collaboration) {
-        collaboration.setShouldSyncAppearance(false);
+        const data = node.getData();
         if (data.operator && !collaboration.isCurrentUserOperator(data)) {
-          node.attr('body/stroke', data.operator.color);
-          node.attr('body/strokeWidth', 3);
+          node.attr('body/stroke', data.operator.color, { ignoreSync: true });
+          node.attr('body/strokeWidth', 3, { ignoreSync: true });
         } else {
-          node.attr('body/stroke', '#333');
-          node.attr('body/strokeWidth', 1);
+          node.attr('body/stroke', '#333333', { ignoreSync: true });
+          node.attr('body/strokeWidth', 2, { ignoreSync: true });
         }
-        collaboration.setShouldSyncAppearance(true);
       }
     }
 
     onMounted(() => {
 
       initGraph()
-
 
       collaboration = new Collaboration(graph, 'x6-demo-room');
 
@@ -234,7 +243,7 @@ export default defineComponent({
         }
 
         // 更新所有现有节点的外观
-        graph.getNodes().forEach(updateNodeAppearance);
+        // graph.getNodes().forEach(updateNodeAppearance);
 
         collaboration.onAwarenessChange((users) => {
           otherUsers.value = users;

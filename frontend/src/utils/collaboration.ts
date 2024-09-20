@@ -21,7 +21,6 @@ export class Collaboration {
   private clientId: string
   private userColor: string
   private awarenessChangeCallback: ((users: UserAwareness[]) => void) | null = null;
-  private shouldSyncAppearance: boolean = true;
 
   constructor(graph: Graph, room: string) {
     this.graph = graph
@@ -75,13 +74,34 @@ export class Collaboration {
     this.doc.destroy()
   }
 
-  isNodeLocked(nodeId: string): boolean {
-    const node = this.graph.getCellById(nodeId) as Node
-    if (!node) return false
-    const data = node.getData() || {}
-    const lockState = data.lockState || { isLocked: false, lockedBy: null }
-    return lockState.isLocked && lockState.lockedBy !== this.clientId
+  setNodeOperator(node: Node): boolean {
+    const currentData = node.getData();
+    if (!currentData.operator) {
+      const operatorInfo: UserAwareness = this.getLocalState();
+      node.setData({ ...currentData, operator: operatorInfo }, { ignoreSync: true });
+      this.updateNode(node);
+      return true;
+    }
+    return false;
   }
+
+  clearNodeOperator(node: Node) {
+    const data = node.getData();
+    if (this.isCurrentUserOperator(data)) {
+      node.setData({...data, operator: null}, { ignoreSync: true });
+      this.updateNode(node);
+    }
+  }
+
+  canOperate(cell: Node | Edge): boolean {
+    const data = cell.getData() || {};
+    return !data.operator || data.operator.id === this.clientId;
+  }
+
+  isCurrentUserOperator(data: Record<string, any>): boolean {
+    return data.operator && data.operator.id === this.clientId;
+  }
+
 
   updateMousePosition(x: number, y: number) {
     const state = this.provider.awareness!.getLocalState() as UserAwareness
@@ -172,9 +192,13 @@ export class Collaboration {
   }
 
   private updateNode(node: Node) {
-    if (this.shouldSyncAppearance) {
-      this.nodesMap.set(node.id, node.toJSON())
+    const nodeData = node.toJSON();
+    // 移除外观相关的属性
+    if (nodeData.attrs && nodeData.attrs.body) {
+      delete nodeData.attrs.body.stroke;
+      delete nodeData.attrs.body.strokeWidth;
     }
+    this.nodesMap.set(node.id, nodeData);
   }
 
   private removeNode(node: Node) {
@@ -207,40 +231,19 @@ export class Collaboration {
     }
   }
 
-  setNodeOperator(node: Node) {
-    const currentData = node.getData();
-    if (!currentData.operator) {
-      const operatorInfo: UserAwareness = this.getLocalState();
-      node.setData({ ...currentData, operator: operatorInfo });
-      this.updateNode(node);
-      return true;
-    }
-    return false;
-  }
-
-  clearNodeOperator(node: Node) {
-    const data = node.getData();
-    if (this.isCurrentUserOperator(data)) {
-      data.operator = null
-      node.setData(data);
-      this.updateNode(node);
-    }
-  }
-
-  canOperate(cell: Node | Edge): boolean {
-    const data = cell.getData() || {};
-    return !data.operator || data.operator.id === this.clientId;
-  }
-
-  isCurrentUserOperator(data: Record<string, any>): boolean {
-    return data.operator && data.operator.id === this.clientId;
-  }
-
   getLocalState(): UserAwareness {
     return this.provider.awareness!.getLocalState() as UserAwareness;
   }
 
-  setShouldSyncAppearance(value: boolean) {
-    this.shouldSyncAppearance = value;
+  updateNodePosition(node: Node) {
+    const { id } = node;
+    const position = node.getPosition();
+    const size = node.getSize();
+    console.log(`Updating node ${id}:`, { position, size });
+    if (position && position.x != null && position.y != null && size && size.width != null && size.height != null) {
+      this.nodesMap.set(id, { id, position, size });
+    } else {
+      console.warn(`Invalid position or size for node ${id}`, { position, size });
+    }
   }
 }
