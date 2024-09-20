@@ -10,8 +10,8 @@
       <div v-for="state in otherUsers" :key="state.id">
         <Cursor
           :color="state.color"
-          :x="state.mouse?.x || 0"
-          :y="state.mouse?.y || 0"
+          :x="getClientX(state.mouse?.x)"
+          :y="getClientY(state.mouse?.y)"
           :message="state.name"
         />
       </div>
@@ -24,8 +24,9 @@
 </template>
 
 <script lang="ts">
+import { throttle } from 'lodash-es';
 import { defineComponent, onMounted, ref, onUnmounted, computed } from 'vue';
-import { Graph, Node } from '@antv/x6';
+import { Graph, Node, Point } from '@antv/x6';
 import { Clipboard } from '@antv/x6-plugin-clipboard'
 import { Snapline } from '@antv/x6-plugin-snapline'
 import { Transform } from '@antv/x6-plugin-transform'
@@ -55,11 +56,15 @@ export default defineComponent({
     }));
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (collaboration && container.value) {
+      if (collaboration && graphRef.value && container.value) {
         const rect = container.value.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        collaboration.updateMousePosition(x, y);
+
+        // 将浏览器坐标转换为画布坐标
+        const localPoint: Point = graphRef.value.clientToLocal({ x, y });
+
+        collaboration.updateMousePosition(localPoint.x, localPoint.y);
       }
     };
 
@@ -274,8 +279,9 @@ export default defineComponent({
         });
       });
 
-      // 添加全局事件监听器
-      window.addEventListener('mousemove', handleMouseMove);
+      // 使用 throttle 来限制 mousemove 事件的触发频率
+      const throttledHandleMouseMove = throttle(handleMouseMove, 50); // 50ms 的节流
+      window.addEventListener('mousemove', throttledHandleMouseMove);
     });
 
     onUnmounted(() => {
@@ -286,11 +292,23 @@ export default defineComponent({
         collaboration.destroy();
       }
       // 移除全局事件监听器
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', throttledHandleMouseMove);
       if (dnd.value) {
         dnd.value.dispose();
       }
     });
+
+    const getClientX = (x: number | undefined) => {
+      if (x === undefined || !graphRef.value || !container.value) return 0;
+      const point = graphRef.value.localToClient({ x, y: 0 });
+      return point.x;
+    };
+
+    const getClientY = (y: number | undefined) => {
+      if (y === undefined || !graphRef.value || !container.value) return 0;
+      const point = graphRef.value.localToClient({ x: 0, y });
+      return point.y;
+    };
 
     return {
       container,
@@ -298,6 +316,8 @@ export default defineComponent({
       otherUsers,
       dnd, // 确保返回 dnd
       graph: graphRef, // 确保返回 graph
+      getClientX,
+      getClientY,
     };
   },
 });
