@@ -21,19 +21,24 @@ export class Collaboration {
   private clientId: string
   private userColor: string
   private awarenessChangeCallback: ((users: UserAwareness[]) => void) | null = null;
+  private username: string;
 
-  constructor(graph: Graph, room: string) {
-    this.graph = graph
-    this.doc = new Y.Doc()
+  constructor(graph: Graph, room: string, username: string, userColor: string) {
+    if (!graph) {
+      throw new Error('Graph instance is required');
+    }
+    this.graph = graph;
+    this.username = username;
+    this.userColor = userColor; // 使用传入的用户颜色
+    this.doc = new Y.Doc();
     this.provider = new HocuspocusProvider({
       url: 'ws://localhost:1234',
       name: room,
       document: this.doc
-    })
+    });
     this.nodesMap = this.doc.getMap('nodes')
     this.edgesMap = this.doc.getMap('edges')
     this.clientId = this.doc.clientID.toString()
-    this.userColor = this.generateRandomColor()
 
     this.bindEvents()
     this.syncInitialState()
@@ -70,7 +75,7 @@ export class Collaboration {
   }
 
   setNodeOperator(node: Node): boolean {
-    const currentData = node.getData() || {}; // 如果 getData() 返回 undefined，使用空对象
+    const currentData = node.getData() || {}; // 果 getData() 返回 undefined，使用空对象
     if (!currentData.operator) {
       const operatorInfo: UserAwareness = this.getLocalState();
       node.setData({ ...currentData, operator: operatorInfo }, { ignoreSync: true });
@@ -132,26 +137,24 @@ export class Collaboration {
     return this.userColor
   }
 
-  private generateRandomColor() {
-    const letters = "0123456789ABCDEF";
-    let color = "#";
-    for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
-
   private setLocalAwareness() {
     const state: UserAwareness = {
       id: this.clientId,
-      name: Math.random().toString(36).substring(2, 15),
+      name: this.username,
       color: this.userColor,
     }
     this.provider.awareness!.setLocalState(state)
   }
 
   private bindEvents() {
-    this.graph.on('node:added', ({ node }) => this.updateNode(node))
+    if (!this.graph) {
+      console.warn('Graph is not initialized');
+      return;
+    }
+    this.graph.on('node:added', ({ node }) => {
+      console.log('Node added:', node.id);
+      this.updateNode(node);
+    });
     this.graph.on('node:removed', ({ node }) => this.removeNode(node))
 
     this.graph.on('edge:added', ({ edge }) => this.updateEdge(edge))
@@ -159,12 +162,15 @@ export class Collaboration {
     this.graph.on('edge:changed', ({ edge }) => this.updateEdge(edge))
 
     this.nodesMap.observe(event => {
+      console.log('NodesMap changed:', event);
       event.changes.keys.forEach((change, key) => {
         if (change.action === 'add' || change.action === 'update') {
-          const nodeData = this.nodesMap.get(key)
-          this.updateGraphNode(key, nodeData)
+          const nodeData = this.nodesMap.get(key);
+          console.log('Updating graph node:', key, nodeData);
+          this.updateGraphNode(key, nodeData);
         } else if (change.action === 'delete') {
-          this.graph.removeCell(key)
+          console.log('Removing graph node:', key);
+          this.graph.removeCell(key);
         }
       })
     })
@@ -182,8 +188,15 @@ export class Collaboration {
   }
 
   private syncInitialState() {
-    this.graph.getNodes().forEach(node => this.updateNode(node))
-    this.graph.getEdges().forEach(edge => this.updateEdge(edge))
+    console.log('Syncing initial state');
+    this.nodesMap.forEach((nodeData, id) => {
+      console.log('Syncing node:', id, nodeData);
+      this.updateGraphNode(id, nodeData);
+    });
+    this.edgesMap.forEach((edgeData, id) => {
+      console.log('Syncing edge:', id, edgeData);
+      this.updateGraphEdge(id, edgeData);
+    });
   }
 
   private updateNode(node: Node) {

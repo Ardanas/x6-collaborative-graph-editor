@@ -1,5 +1,6 @@
 <template>
   <div class="flow-container">
+    <UserInfoDialog v-if="showDialog" @info-saved="handleInfoSaved" />
     <Toolbar :dnd="dnd" :graph="graph" />
     <div
       ref="container"
@@ -25,7 +26,7 @@
 
 <script lang="ts">
 import { throttle } from 'lodash-es';
-import { defineComponent, onMounted, ref, onUnmounted, computed } from 'vue';
+import { defineComponent, onMounted, ref, onUnmounted, computed, watch, nextTick } from 'vue';
 import { Graph, Node, Point } from '@antv/x6';
 import { Clipboard } from '@antv/x6-plugin-clipboard'
 import { Snapline } from '@antv/x6-plugin-snapline'
@@ -33,6 +34,7 @@ import { Transform } from '@antv/x6-plugin-transform'
 import { Scroller } from '@antv/x6-plugin-scroller'
 import { Selection } from '@antv/x6-plugin-selection'
 import { Dnd } from '@antv/x6-plugin-dnd'
+import UserInfoDialog from './UserInfoDialog.vue';
 
 import { Collaboration } from '../utils/collaboration';
 import Cursor from './Cursor.vue';
@@ -41,7 +43,7 @@ import Toolbar from './Toolbar.vue';
 
 export default defineComponent({
   name: 'GraphComponent',
-  components: { Cursor, Avatar, Toolbar },
+  components: { Cursor, Avatar, Toolbar, UserInfoDialog },
   setup() {
     const container = ref<HTMLDivElement | null>(null);
     let graph: Graph | null = null;
@@ -50,6 +52,8 @@ export default defineComponent({
     const otherUsers = ref<any[]>([]);
     const dnd = ref<Dnd | null>(null);
     const graphRef = ref<Graph | null>(null);
+    const showDialog = ref(true);
+    const userInfo = ref(null);
 
     const cursorStyle = computed(() => ({
       cursor: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="fill: ${userColor.value};"><circle cx="8" cy="8" r="8"/></svg>') 8 8, auto`
@@ -60,15 +64,59 @@ export default defineComponent({
         const rect = container.value.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
-        // 将浏览器坐标转换为画布坐标
         const localPoint: Point = graphRef.value.clientToLocal({ x, y });
-
         collaboration.updateMousePosition(localPoint.x, localPoint.y);
       }
     };
 
-    function initGraph() {
+    const throttledHandleMouseMove = throttle(handleMouseMove, 50);
+
+    const handleInfoSaved = (info) => {
+      userInfo.value = info;
+      showDialog.value = false;
+      userColor.value = info.userColor;
+      nextTick(() => {
+        initCollaboration();
+      });
+    };
+
+    const initCollaboration = () => {
+      if (userInfo.value && graphRef.value) {
+        collaboration = new Collaboration(
+          graphRef.value,
+          userInfo.value.roomName,
+          userInfo.value.username,
+          userInfo.value.userColor
+        );
+        collaboration.onReady(() => {
+          if (graphRef.value && graphRef.value.getNodes().length === 0) {
+            collaboration?.addNode({
+              shape: 'custom-rect',
+              x: 100,
+              y: 100,
+              width: 80,
+              height: 40,
+              label: '矩形',
+              attrs: {
+                body: {
+                  fill: '#f5f5f5',
+                },
+              },
+              data: {}
+            });
+          }
+          collaboration.onAwarenessChange((users) => {
+            otherUsers.value = users;
+          });
+        });
+      }
+    };
+
+    const initGraph = () => {
+      if (!container.value) {
+        return;
+      }
+
       graphRef.value = new Graph({
         container: container.value,
         grid: true,
@@ -76,6 +124,7 @@ export default defineComponent({
         rotating: false,
         snapline: true,
         history: true,
+        virtual: true,
         background: {
           color: '#F2F7FA',
         },
@@ -97,48 +146,23 @@ export default defineComponent({
         },
       });
 
-      graphRef.value.use(
-        new Transform({
-          resizing: true,
-        }),
-      )
+      graphRef.value.use(new Transform({ resizing: true }));
+      graphRef.value.use(new Snapline({ enabled: true }));
+      graphRef.value.use(new Clipboard({ enabled: true }));
+      graphRef.value.use(new Scroller({ enabled: true, pannable: true }));
+      graphRef.value.use(new Selection({
+        enabled: true,
+        multiple: true,
+        movable: true,
+        showNodeSelectionBox: true,
+      }));
 
-      graphRef.value.use(
-        new Snapline({
-          enabled: true,
-        }),
-      )
-
-      graphRef.value.use(
-        new Clipboard({
-          enabled: true,
-        }),
-      )
-
-      graphRef.value.use(
-        new Scroller({
-          enabled: true,
-          pannable: true,
-        }),
-      )
-
-      graphRef.value.use(
-        new Selection({
-          enabled: true,
-          multiple: true,
-          movable: true,
-          showNodeSelectionBox: true,
-        }),
-      )
-
-      // 初始化 DND 插件
       dnd.value = new Dnd({
         target: graphRef.value,
         scaled: false,
         animation: true,
       });
 
-      // 添加自定义节点
       Graph.registerNode(
         'custom-rect',
         {
@@ -157,8 +181,6 @@ export default defineComponent({
         true
       );
 
-      // 移除 node:mousedown 和 node:mouseup 事件监听器
-      // 添加 node:mousemove 事件监听器
       graphRef.value.on('node:mousemove', ({ node }) => {
         if (!graphRef.value.isSelected(node) && collaboration?.canOperate(node)) {
           collaboration.setNodeOperator(node);
@@ -180,8 +202,6 @@ export default defineComponent({
             collaboration.setNodeOperator(cell);
           }
         });
-        console.log('removed',removed);
-
         removed.forEach((cell) => {
           if (cell.isNode()) {
             collaboration?.clearNodeOperator(cell);
@@ -197,7 +217,6 @@ export default defineComponent({
           } else if (key === 'data') {
             updateNodeAppearance(node);
           } else if (key === 'attrs') {
-            // 不同步外观相关的属性
             if (!options?.ignoreSync && !['body/stroke', 'body/strokeWidth'].includes(current.path)) {
               collaboration?.updateNode(node);
             }
@@ -212,9 +231,8 @@ export default defineComponent({
         }
       });
 
-      // 添加全局事件监听器
-      window.addEventListener('mousemove', handleMouseMove);
-    }
+      window.addEventListener('mousemove', throttledHandleMouseMove);
+    };
 
     function updateNodeAppearance(node: Node) {
       if (collaboration) {
@@ -229,59 +247,17 @@ export default defineComponent({
       }
     }
 
-    // 移除 onDrop 函数，因为我们不再需要它
-
     onMounted(() => {
-
-      initGraph()
-
-      collaboration = new Collaboration(graphRef.value, 'x6-demo-room');
-
-      collaboration.onReady(() => {
-        userColor.value = collaboration.getCurrentUserColor();
-        if (graphRef.value && graphRef.value.getNodes().length === 0) {
-          collaboration?.addNode({
-            shape: 'custom-rect',
-            x: 100,
-            y: 100,
-            width: 80,
-            height: 40,
-            label: '矩形',
-            attrs: {
-              body: {
-                fill: '#f5f5f5',
-              },
-            },
-            data: {}
-          });
-
-          collaboration?.addNode({
-            shape: 'custom-rect',
-            x: 300,
-            y: 100,
-            width: 60,
-            height: 60,
-            label: '圆形',
-            attrs: {
-              body: {
-                fill: '#f5f5f5',
-              },
-            },
-            data: {}
-          });
-        }
-
-        // 更新所有现有节点的外观
-        // graphRef.value.getNodes().forEach(updateNodeAppearance);
-
-        collaboration.onAwarenessChange((users) => {
-          otherUsers.value = users;
-        });
-      });
-
-      // 使用 throttle 来限制 mousemove 事件的触发频率
-      const throttledHandleMouseMove = throttle(handleMouseMove, 50); // 50ms 的节流
-      window.addEventListener('mousemove', throttledHandleMouseMove);
+      const storedInfo = localStorage.getItem('userInfo');
+      if (storedInfo) {
+        userInfo.value = JSON.parse(storedInfo);
+        userColor.value = userInfo.value.userColor;
+        showDialog.value = false;
+        initGraph();
+        initCollaboration();
+      } else {
+        initGraph();
+      }
     });
 
     onUnmounted(() => {
@@ -291,7 +267,6 @@ export default defineComponent({
       if (collaboration) {
         collaboration.destroy();
       }
-      // 移除全局事件监听器
       window.removeEventListener('mousemove', throttledHandleMouseMove);
       if (dnd.value) {
         dnd.value.dispose();
@@ -314,10 +289,12 @@ export default defineComponent({
       container,
       cursorStyle,
       otherUsers,
-      dnd, // 确保返回 dnd
-      graph: graphRef, // 确保返回 graph
+      dnd,
+      graph: graphRef,
       getClientX,
       getClientY,
+      showDialog,
+      handleInfoSaved,
     };
   },
 });
