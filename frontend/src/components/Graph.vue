@@ -225,12 +225,6 @@ export default defineComponent({
         }
       });
 
-      graphRef.value.on('node:added', ({ node }) => {
-        if (collaboration?.canOperate(node)) {
-          collaboration.setNodeOperator(node);
-          updateNodeAppearance(node);
-        }
-      });
 
       window.addEventListener('mousemove', throttledHandleMouseMove);
     };
