@@ -17,6 +17,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from 'vue';
+import { storageService } from '../utils/storage';
 
 export default defineComponent({
   name: 'UserInfoDialog',
@@ -43,7 +44,7 @@ export default defineComponent({
         roomName: roomName.value,
         userColor: userColor
       };
-      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      storageService.setItem('userInfo', userInfo);
       emit('info-saved', userInfo);
       if (dialog.value) {
         dialog.value.close();

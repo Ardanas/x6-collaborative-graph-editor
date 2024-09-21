@@ -35,6 +35,7 @@ import { Scroller } from '@antv/x6-plugin-scroller'
 import { Selection } from '@antv/x6-plugin-selection'
 import { Dnd } from '@antv/x6-plugin-dnd'
 import UserInfoDialog from './UserInfoDialog.vue';
+import { storageService } from '../utils/storage';
 
 import { Collaboration } from '../utils/collaboration';
 import Cursor from './Cursor.vue';
@@ -248,9 +249,9 @@ export default defineComponent({
     }
 
     onMounted(() => {
-      const storedInfo = localStorage.getItem('userInfo');
+      const storedInfo = storageService.getItem('userInfo');
       if (storedInfo) {
-        userInfo.value = JSON.parse(storedInfo);
+        userInfo.value = storedInfo;
         userColor.value = userInfo.value.userColor;
         showDialog.value = false;
         initGraph();
