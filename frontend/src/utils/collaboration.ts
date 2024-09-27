@@ -103,11 +103,16 @@ export class Collaboration {
   }
 
 
-  updateMousePosition(x: number, y: number) {
-    const state = this.provider.awareness!.getLocalState() as UserAwareness
+  updateMousePosition(clientX: number, clientY: number) {
+    const localPoint = this.graph.clientToLocal({
+      x: clientX ,
+      y: clientY,
+    });
+
+    const state = this.provider.awareness!.getLocalState() as UserAwareness;
     if (state) {
-      state.mouse = { x, y }
-      this.provider.awareness!.setLocalState(state)
+      state.mouse = { x: localPoint.x, y: localPoint.y }; // 更新为本地坐标
+      this.provider.awareness!.setLocalState(state);
     }
   }
 

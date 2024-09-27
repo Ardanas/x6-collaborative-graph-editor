@@ -62,11 +62,7 @@ export default defineComponent({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (collaboration && graphRef.value && container.value) {
-        const rect = container.value.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const localPoint: Point = graphRef.value.clientToLocal({ x, y });
-        collaboration.updateMousePosition(localPoint.x, localPoint.y);
+        collaboration.updateMousePosition(e.clientX, e.clientY); // 直接传递客户端坐标
       }
     };
 
