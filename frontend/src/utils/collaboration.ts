@@ -56,9 +56,13 @@ export class Collaboration {
 
   onReady(callback: () => void) {
     if (this.provider.synced) {
-      callback()
+      callback();
+      this.handleAwarenessChange(); // 立即触发一次awareness变化
     } else {
-      this.readyCallbacks.push(callback)
+      this.readyCallbacks.push(() => {
+        callback();
+        this.handleAwarenessChange(); // 在ready回调中触发awareness变化
+      });
     }
   }
 
@@ -258,5 +262,15 @@ export class Collaboration {
     } else {
       console.warn(`Invalid position or size for node ${id}`, { position, size });
     }
+  }
+
+  getAllUsers(): UserAwareness[] {
+    const users: UserAwareness[] = [];
+    this.provider.awareness!.getStates().forEach((state: any, clientId: number) => {
+      if (state && clientId.toString() !== this.clientId) {
+        users.push(state as UserAwareness);
+      }
+    });
+    return users;
   }
 }

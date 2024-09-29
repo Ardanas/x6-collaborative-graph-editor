@@ -102,6 +102,8 @@ export default defineComponent({
               data: {}
             });
           }
+          // 初始化时获取所有用户
+          otherUsers.value = collaboration.getAllUsers();
           collaboration.onAwarenessChange((users) => {
             otherUsers.value = users;
           });
